@@ -3,6 +3,7 @@ Test raster_layers
 ------------------
 
 """
+import pytest
 import xyzservices
 from jinja2 import Template
 
@@ -11,7 +12,7 @@ from folium.utilities import normalize
 
 
 def test_tile_layer():
-    m = folium.Map([48.0, 5.0], tiles="stamentoner", zoom_start=6)
+    m = folium.Map([48.0, 5.0], zoom_start=6)
     layer = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 
     folium.raster_layers.TileLayer(
@@ -113,23 +114,26 @@ def test_image_overlay():
     assert bounds == [[0, -180], [90, 180]], bounds
 
 
-def test_xyzservices():
-    m = folium.Map([48.0, 5.0], tiles=xyzservices.providers.Stamen.Toner, zoom_start=6)
+@pytest.mark.parametrize(
+    "tiles", ["CartoDB DarkMatter", xyzservices.providers.CartoDB.DarkMatter]
+)
+def test_xyzservices(tiles):
+    m = folium.Map([48.0, 5.0], tiles=tiles, zoom_start=6)
 
     folium.raster_layers.TileLayer(
-        tiles=xyzservices.providers.Stamen.Terrain,
+        tiles=xyzservices.providers.CartoDB.Positron,
     ).add_to(m)
     folium.LayerControl().add_to(m)
 
     out = m._parent.render()
     assert (
-        xyzservices.providers.Stamen.Toner.build_url(
+        xyzservices.providers.CartoDB.DarkMatter.build_url(
             fill_subdomain=False, scale_factor="{r}"
         )
         in out
     )
     assert (
-        xyzservices.providers.Stamen.Terrain.build_url(
+        xyzservices.providers.CartoDB.Positron.build_url(
             fill_subdomain=False, scale_factor="{r}"
         )
         in out

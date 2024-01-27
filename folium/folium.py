@@ -8,7 +8,7 @@ import webbrowser
 from typing import Any, List, Optional, Sequence, Union
 
 from branca.element import Element, Figure, MacroElement
-from jinja2 import Environment, PackageLoader, Template
+from jinja2 import Template
 
 from folium.elements import JSCSSMixin
 from folium.map import FitBounds, Layer
@@ -22,12 +22,9 @@ from folium.utilities import (
     validate_location,
 )
 
-ENV = Environment(loader=PackageLoader("folium", "templates"))
-
-
 _default_js = [
     ("leaflet", "https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"),
-    ("jquery", "https://code.jquery.com/jquery-1.12.4.min.js"),
+    ("jquery", "https://code.jquery.com/jquery-3.7.1.min.js"),
     (
         "bootstrap",
         "https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js",
@@ -85,16 +82,14 @@ class Map(JSCSSMixin, MacroElement):
     """Create a Map with Folium and Leaflet.js
 
     Generate a base map of given width and height with either default
-    tilesets or a custom tileset URL. The following tilesets are built-in
-    to Folium. Pass any of the following to the "tiles" keyword:
+    tilesets or a custom tileset URL. Folium has built-in all tilesets
+    available in the ``xyzservices`` package. For example, you can pass
+    any of the following to the "tiles" keyword:
 
         - "OpenStreetMap"
-        - "Mapbox Bright" (Limited levels of zoom for free tiles)
-        - "Mapbox Control Room" (Limited levels of zoom for free tiles)
-        - "Stamen" (Terrain, Toner, and Watercolor)
-        - "Cloudmade" (Must pass API key)
-        - "Mapbox" (Must pass API key)
-        - "CartoDB" (positron and dark_matter)
+        - "CartoDB Positron"
+        - "CartoBD Voyager"
+        - "NASAGIBS Blue Marble"
 
     You can pass a custom tileset to Folium by passing a
     :class:`xyzservices.TileProvider` or a Leaflet-style
@@ -262,7 +257,6 @@ class Map(JSCSSMixin, MacroElement):
     ):
         super().__init__()
         self._name = "Map"
-        self._env = ENV
 
         self._png_image: Optional[bytes] = None
         self.png_enabled = png_enabled

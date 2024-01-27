@@ -137,7 +137,7 @@ class Vega(JSCSSMixin, Element):
     default_js = [
         ("d3", "https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"),
         ("vega", "https://cdnjs.cloudflare.com/ajax/libs/vega/1.4.3/vega.min.js"),
-        ("jquery", "https://code.jquery.com/jquery-2.1.0.min.js"),
+        ("jquery", "https://code.jquery.com/jquery-3.7.1.min.js"),
     ]
 
     def __init__(
@@ -468,10 +468,13 @@ class GeoJson(Layer):
         * If `__geo_interface__` is available, the `__geo_interface__`
         dictionary will be serialized to JSON and
         reprojected if `to_crs` is available.
+
     style_function: function, default None
         Function mapping a GeoJson Feature to a style dict.
     highlight_function: function, default None
         Function mapping a GeoJson Feature to a style dict for mouse events.
+    popup_keep_highlighted: bool, default False
+        Whether to keep the highlighting active while the popup is open
     name : string, default None
         The name of the Layer, as it will appear in LayerControls
     overlay : bool, default True
@@ -571,7 +574,10 @@ class GeoJson(Layer):
                 {%- if this.highlight %}
                 mouseout: function(e) {
                     if(typeof e.target.setStyle === "function"){
-                        {{ this.get_name() }}.resetStyle(e.target);
+                        {%- if this.popup_keep_highlighted %}
+                        if (!e.target.isPopupOpen())
+                        {%- endif %}
+                            {{ this.get_name() }}.resetStyle(e.target);
                     }
                 },
                 mouseover: function(e) {
@@ -580,6 +586,21 @@ class GeoJson(Layer):
                         e.target.setStyle(highlightStyle);
                     }
                 },
+                {%- if this.popup_keep_highlighted %}
+                popupopen: function(e) {
+                    if(typeof e.target.setStyle === "function"){
+                        const highlightStyle = {{ this.get_name() }}_highlighter(e.target.feature)
+                        e.target.setStyle(highlightStyle);
+                        e.target.bindPopup(e.popup)
+                    }
+                },
+                popupclose: function(e) {
+                    if(typeof e.target.setStyle === "function"){
+                        {{ this.get_name() }}.resetStyle(e.target);
+                        e.target.unbindPopup()
+                    }
+                },
+                {%- endif %}
                 {%- endif %}
                 {%- if this.zoom_on_click %}
                 click: function(e) {
@@ -631,6 +652,7 @@ class GeoJson(Layer):
         data: Any,
         style_function: Optional[Callable] = None,
         highlight_function: Optional[Callable] = None,
+        popup_keep_highlighted: bool = False,
         name: Optional[str] = None,
         overlay: bool = True,
         control: bool = True,
@@ -658,6 +680,13 @@ class GeoJson(Layer):
                 raise TypeError(
                     "Only Marker, Circle, and CircleMarker are supported as GeoJson marker types."
                 )
+
+        if popup_keep_highlighted and popup is None:
+            raise ValueError(
+                "A popup is needed to use the popup_keep_highlighted feature"
+            )
+        self.popup_keep_highlighted = popup_keep_highlighted
+
         self.marker = marker
         self.options = parse_options(**kwargs)
 
@@ -883,6 +912,7 @@ class TopoJson(JSCSSMixin, Layer):
         * If dict, then data will be converted to JSON and embedded
         in the JavaScript.
         * If str, then data will be passed to the JavaScript as-is.
+
     object_path: str
         The path of the desired object into the TopoJson structure.
         Ex: 'objects.myobject'.
@@ -1118,7 +1148,8 @@ class GeoJsonDetail(MacroElement):
         geom_collections = [
             feature.get("properties") if feature.get("properties") is not None else key
             for key, feature in enumerate(self._parent.data["features"])
-            if feature["geometry"]["type"] == "GeometryCollection"
+            if feature["geometry"]
+            and feature["geometry"]["type"] == "GeometryCollection"
         ]
         if any(geom_collections):
             warnings.warn(
@@ -1134,7 +1165,11 @@ class GeoJsonDetail(MacroElement):
         """Renders the HTML representation of the element."""
         figure = self.get_root()
         if isinstance(self._parent, GeoJson):
-            keys = tuple(self._parent.data["features"][0]["properties"].keys())
+            keys = tuple(
+                self._parent.data["features"][0]["properties"].keys()
+                if self._parent.data["features"]
+                else []
+            )
             self.warn_for_geometry_collections()
         elif isinstance(self._parent, TopoJson):
             obj_name = self._parent.object_path.split(".")[-1]
@@ -1818,6 +1853,7 @@ class CustomIcon(Icon):
         output file.
         * If array-like, it will be converted to PNG base64 string
         and embedded in the output.
+
     icon_size : tuple of 2 int, optional
         Size of the icon image in pixels.
     icon_anchor : tuple of 2 int, optional
